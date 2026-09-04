@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sgx-pyspark"
+version = "0.1.0"
+description = "CP-ABE + Occlum TEE + EAC 写门控的 PySpark 安全计算框架"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cryptography>=42.0.0",
+]
+
+[project.optional-dependencies]
+spark = ["pyspark>=3.2.0"]
+
+[project.scripts]
+sgx-pyspark = "sgx_pyspark.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sgx_pyspark*"]

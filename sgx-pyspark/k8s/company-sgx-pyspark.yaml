@@ -1,0 +1,146 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: company-sgx-pyspark
+  namespace: spark
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 86400
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: "10.26.40.84"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: company-sgx-pyspark-benchmark
+          image: docker.io/library/spark:3.2.3
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              DRIVER_IP=$(hostname -I | awk '{print $1}')
+              export SGX_PYSPARK_ROOT=/sgx-pyspark
+              export SGX_PYSPARK_CONFIG=/sgx-pyspark/conf/sgx-pyspark.conf
+              export SGX_PYSPARK_TEE_MODE=sim
+              export SGX_HDFS_MODE=real
+              export HADOOP_CONF_DIR=/etc/hadoop
+              export HADOOP_HOME=/opt/hadoop
+              export HADOOP_COMMON_HOME=/opt/hadoop
+              export HADOOP_HDFS_HOME=/opt/hadoop
+              export HADOOP_USER_NAME=shanlicheng
+              export HDFS_DEFAULT_FS=hdfs://10.26.40.83:9000
+              export JAVA_HOME="${JAVA_HOME:-/opt/java/openjdk}"
+              export PATH=/opt/hadoop/bin:/usr/local/bin:$PATH
+              export PYTHONPATH=/sgx-pyspark
+              export SGX_EXP_TARGET_GB=${TARGET_GB:-100}
+              export SGX_EXP_CHECKPOINT_GB=${CHECKPOINT_GB:-10}
+              export BENCH_MODE=${BENCH_MODE:-all}
+              export SGX_EXP_RESULT_DIR=/results-host
+              export SGX_SPARK_PARTITIONS=${SGX_SPARK_PARTITIONS:-496}
+              export COMP_EXP_ACCESS_MODE=abe
+              export COMP_EXP_SYSTEM=sgx-pyspark
+
+              mkdir -p "$SGX_EXP_RESULT_DIR"
+              : > "$SGX_EXP_RESULT_DIR/cluster_benchmark.log"
+
+              pip3 install --user -q cryptography 2>/dev/null || pip install --user -q cryptography
+
+              echo "=== sgx-pyspark Company Distributed Benchmark (真实 HDFS) ===" | tee -a "$SGX_EXP_RESULT_DIR/cluster_benchmark.log"
+              echo "Driver=${DRIVER_IP} | partitions=${SGX_SPARK_PARTITIONS} | HDFS=${HDFS_DEFAULT_FS}" | tee -a "$SGX_EXP_RESULT_DIR/cluster_benchmark.log"
+
+              /opt/spark/bin/spark-submit \
+                --master spark://10.108.117.130:7077 \
+                --deploy-mode client \
+                --driver-host ${DRIVER_IP} \
+                --conf spark.driver.host=${DRIVER_IP} \
+                --conf spark.driver.bindAddress=0.0.0.0 \
+                --conf spark.driver.cores=4 \
+                --conf spark.driver.memory=16g \
+                --conf spark.cores.max=496 \
+                --conf spark.executor.cores=8 \
+                --conf spark.executor.instances=62 \
+                --conf spark.executor.memory=10g \
+                --conf spark.executor.memoryOverhead=4g \
+                --conf spark.default.parallelism=${SGX_SPARK_PARTITIONS} \
+                --conf spark.sql.shuffle.partitions=${SGX_SPARK_PARTITIONS} \
+                --conf spark.memory.fraction=0.8 \
+                --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
+                --conf spark.network.timeout=800s \
+                --conf spark.executor.heartbeatInterval=60s \
+                --conf spark.hadoop.fs.defaultFS=${HDFS_DEFAULT_FS} \
+                --conf spark.ui.enabled=false \
+                --conf spark.eventLog.enabled=false \
+                --conf spark.log.level=WARN \
+                --conf spark.executorEnv.SGX_PYSPARK_ROOT=/sgx-pyspark \
+                --conf spark.executorEnv.SGX_PYSPARK_CONFIG=/sgx-pyspark/conf/sgx-pyspark.conf \
+                --conf spark.executorEnv.SGX_PYSPARK_TEE_MODE=sim \
+                --conf spark.executorEnv.SGX_HDFS_MODE=real \
+                --conf spark.executorEnv.HADOOP_USER_NAME=shanlicheng \
+                --conf spark.executorEnv.HADOOP_CONF_DIR=/etc/hadoop \
+                --conf spark.executorEnv.HADOOP_HOME=/opt/hadoop \
+                --conf spark.executorEnv.PYTHONPATH=/sgx-pyspark \
+                --conf spark.executorEnv.SGX_EXP_TARGET_GB=${SGX_EXP_TARGET_GB} \
+                --conf spark.executorEnv.SGX_EXP_CHECKPOINT_GB=${SGX_EXP_CHECKPOINT_GB} \
+                --conf spark.executorEnv.SGX_EXP_RESULT_DIR=/results-host \
+                --conf spark.executorEnv.COMP_EXP_ACCESS_MODE=abe \
+                --conf spark.pyspark.python=python3 \
+                --conf spark.pyspark.driver.python=python3 \
+                --py-files /sgx-pyspark/sgx_pyspark \
+                /sgx-pyspark/sgx_pyspark/benchmark/spark_company_bench.py \
+                >> "$SGX_EXP_RESULT_DIR/cluster_benchmark.log" 2>&1
+
+              echo "Benchmark finished, results in $SGX_EXP_RESULT_DIR" | tee -a "$SGX_EXP_RESULT_DIR/cluster_benchmark.log"
+          env:
+            - name: TARGET_GB
+              value: "100"
+            - name: CHECKPOINT_GB
+              value: "10"
+            - name: BENCH_MODE
+              value: "all"
+            - name: SGX_SPARK_PARTITIONS
+              value: "496"
+          resources:
+            requests:
+              cpu: "8"
+              memory: "32Gi"
+            limits:
+              cpu: "16"
+              memory: "48Gi"
+          volumeMounts:
+            - name: sgx-pyspark-root
+              mountPath: /sgx-pyspark
+              readOnly: true
+            - name: hadoop-conf
+              mountPath: /etc/hadoop
+              readOnly: true
+            - name: hadoop-home
+              mountPath: /opt/hadoop
+              readOnly: true
+            - name: results-host
+              mountPath: /results-host
+      volumes:
+        - name: sgx-pyspark-root
+          hostPath:
+            path: /home/shanlicheng/test-benchmark/sgx-pyspark
+            type: Directory
+        - name: hadoop-conf
+          hostPath:
+            path: /home/shanlicheng/opt/hadoop/etc/hadoop
+            type: Directory
+        - name: hadoop-home
+          hostPath:
+            path: /home/shanlicheng/opt/hadoop
+            type: Directory
+        - name: results-host
+          hostPath:
+            path: /home/shanlicheng/test-benchmark/sgx-pyspark/result/company
+            type: DirectoryOrCreate

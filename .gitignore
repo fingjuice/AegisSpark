@@ -1,0 +1,40 @@
+# 构建产物与密钥（勿提交）
+
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+**/native/build/
+**/target/
+spark-warehouse/
+occlum/instance/
+
+# 密钥与主密钥
+**/conf/keys/
+*.pem
+abe_msk.bin
+
+# 本地/超大运行产物
+*.log
+*.pid
+hs_err_pid*.log
+Experimental-Result/
+Experimental-Result-BigDL-PPML/
+cluster_100gb.log
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# 可选：若重新生成超大明细 CSV，默认忽略
+ABE-Spark/result/**/archive-*/
+sgx-pyspark/result/company/node_*/
+sgx-pyspark/result/company/abe_time.csv
+sgx-pyspark/result/company/abe_encrypt_time.csv
+sgx-pyspark/result/company/eac_time.csv

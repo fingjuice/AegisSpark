@@ -1,0 +1,26 @@
+# 基于 Occlum LibOS 的 sgx-pyspark 运行镜像
+FROM occlum/occlum:0.29.5-ubuntu20.04
+
+ENV SGX_PYSPARK_ROOT=/opt/sgx-pyspark
+ENV MCL_ROOT=/opt/mcl
+ENV ABE_SPARK_ROOT=/opt/abe-spark
+ENV LD_LIBRARY_PATH=/opt/sgx-pyspark/native/build:/opt/mcl/lib
+ENV PYTHONPATH=/opt/sgx-pyspark
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip libgmp10 openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/sgx-pyspark
+
+COPY sgx_pyspark/ /opt/sgx-pyspark/sgx_pyspark/
+COPY conf/ /opt/sgx-pyspark/conf/
+COPY native/build/libsgx_pyspark_ffi.so /opt/sgx-pyspark/native/build/
+COPY scripts/ /opt/sgx-pyspark/scripts/
+COPY examples/ /opt/sgx-pyspark/examples/
+COPY occlum/Occlum.json /opt/sgx-pyspark/occlum/Occlum.json
+
+# mcl 运行时库需从构建上下文复制或挂载
+# COPY mcl-libs/ /opt/mcl/lib/
+
+ENTRYPOINT ["/bin/bash"]
