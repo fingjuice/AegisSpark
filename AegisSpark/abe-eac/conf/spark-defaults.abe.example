@@ -1,0 +1,12 @@
+# Spark 作业示例：引用 ABE-Spark 统一主配置
+# 复制到 $SPARK_HOME/conf/spark-defaults.conf 或 spark-submit --properties-file
+
+spark.abe.master.config=${env:ABE_SPARK_ROOT}/abe-eac/conf/abe-spark.conf
+spark.abe.enabled=true
+spark.abe.crypto.config=${env:ABE_SPARK_ROOT}/abe-eac/conf/abe-spark.conf
+spark.abe.user.id=analyst_user
+spark.abe.user.attributes=role:analyst,dept:finance
+spark.abe.write.verification.url=tee://write-verification:9000
+
+# Executor 加载 native JNI（按 abe-spark.conf [spark] executor_native_library_path 调整）
+spark.executor.extraLibraryPath=${env:MCL_ROOT}/build-eac/lib:${env:ABE_SPARK_ROOT}/abe-eac/native/build

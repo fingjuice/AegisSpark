@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package abe_spark;
+
+option java_package = "org.apache.spark.abe.proto";
+option java_outer_classname = "AbeSparkProto";
+
+// 系统管理员签发的 Spark 作业初始写授权
+message AdminEndorsement {
+  string app_code_hash = 1;
+  repeated string allowed_root_directories = 2;
+  int64 timestamp = 3;
+  string admin_signature = 4;
+}
+
+// 单列/列组 ABE 安全头
+message HsecColumn {
+  repeated string column_scope = 1;
+  string policy_expression = 2;
+  bytes encrypted_dek = 3;
+}
+
+// HDFS xattr 存储的 ABE 元数据头
+message Hsec {
+  string file_path = 1;
+  repeated HsecColumn abe_headers = 2;
+}
+
+// Driver TEE 派发给 Worker 的动态写能力票据
+message TaskTicket {
+  string job_id = 1;
+  string task_id = 2;
+  string worker_ip = 3;
+  string allowed_target_path = 4;
+  int64 expires_at = 5;
+  string driver_signature = 6;
+}

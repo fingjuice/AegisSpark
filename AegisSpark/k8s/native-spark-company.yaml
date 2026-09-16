@@ -1,0 +1,150 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: native-spark-company
+  namespace: spark
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 86400
+  template:
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      enableServiceLinks: false
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: "10.26.40.84"
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: native-spark-benchmark
+          image: docker.io/library/spark:3.2.3
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              DRIVER_IP=$(hostname -I | awk '{print $1}')
+              export ABE_SPARK_ROOT=/abe-spark
+              export HADOOP_CONF_DIR=/etc/hadoop
+              export HADOOP_HOME=/opt/hadoop
+              export HADOOP_COMMON_HOME=/opt/hadoop
+              export HADOOP_HDFS_HOME=/opt/hadoop
+              export JAVA_HOME="${JAVA_HOME:-/opt/java/openjdk}"
+              export PATH=/opt/hadoop/bin:$PATH
+              export HADOOP_USER_NAME=shanlicheng
+              export TARGET_GB=${TARGET_GB:-100}
+              export CHECKPOINT_GB=${CHECKPOINT_GB:-1}
+              export BENCH_MODE=${BENCH_MODE:-all}
+              export SPARK_CORES_MAX=${SPARK_CORES_MAX:-372}
+              export SPARK_PARALLELISM=${SPARK_PARALLELISM:-${SPARK_CORES_MAX}}
+              export SPARK_EXECUTOR_CORES=${SPARK_EXECUTOR_CORES:-8}
+              export SPARK_EXECUTOR_INSTANCES=${SPARK_EXECUTOR_INSTANCES:-46}
+              export HDFS_DATA_ROOT=${HDFS_DATA_ROOT:-hdfs://10.26.40.83:9000/abe-bench/native-data}
+              export WRITE_CSV=${WRITE_CSV:-write_perf.csv}
+              export READ_CSV=${READ_CSV:-read_perf.csv}
+              export RESULT_DIR=/results-host
+              mkdir -p "$RESULT_DIR"
+              : > "$RESULT_DIR/native_benchmark.log"
+              echo "===== native-spark start $(date -Is) mode=${BENCH_MODE} =====" \
+                >> "$RESULT_DIR/native_benchmark.log"
+              echo "Driver=${DRIVER_IP} | cores.max=${SPARK_CORES_MAX} | parallelism=${SPARK_PARALLELISM} | executors=${SPARK_EXECUTOR_INSTANCES}x${SPARK_EXECUTOR_CORES}"
+
+              /opt/spark/bin/spark-submit \
+                --master spark://10.108.117.130:7077 \
+                --deploy-mode client \
+                --class org.apache.spark.abe.benchmark.NativeSparkCompanyBenchmark \
+                --jars /abe-jars/spark-abe-eac_2.12-3.2.3.jar \
+                --conf spark.driver.host=${DRIVER_IP} \
+                --conf spark.driver.bindAddress=0.0.0.0 \
+                --conf spark.driver.cores=4 \
+                --conf spark.driver.memory=16g \
+                --conf spark.cores.max=${SPARK_CORES_MAX} \
+                --conf spark.executor.cores=${SPARK_EXECUTOR_CORES} \
+                --conf spark.executor.instances=${SPARK_EXECUTOR_INSTANCES} \
+                --conf spark.executor.memory=10g \
+                --conf spark.executor.memoryOverhead=4g \
+                --conf spark.default.parallelism=${SPARK_PARALLELISM} \
+                --conf spark.sql.shuffle.partitions=${SPARK_PARALLELISM} \
+                --conf spark.memory.fraction=0.8 \
+                --conf spark.serializer=org.apache.spark.serializer.KryoSerializer \
+                --conf spark.network.timeout=800s \
+                --conf spark.executor.heartbeatInterval=60s \
+                --conf spark.task.maxFailures=8 \
+                --conf spark.hadoop.fs.defaultFS=hdfs://10.26.40.83:9000 \
+                --conf spark.ui.enabled=false \
+                --conf spark.eventLog.enabled=false \
+                --conf spark.log.level=WARN \
+                --conf spark.executorEnv.HADOOP_USER_NAME=shanlicheng \
+                --conf spark.executorEnv.HADOOP_CONF_DIR=/etc/hadoop \
+                /abe-jars/spark-abe-eac_2.12-3.2.3.jar \
+                >> "$RESULT_DIR/native_benchmark.log" 2>&1
+
+              echo "Benchmark finished, results in $RESULT_DIR"
+          env:
+            - name: TARGET_GB
+              value: "100"
+            - name: CHECKPOINT_GB
+              value: "1"
+            - name: BENCH_MODE
+              value: "all"
+            - name: HDFS_DATA_ROOT
+              value: "hdfs://10.26.40.83:9000/abe-bench/native-data"
+            - name: WRITE_CSV
+              value: "write_perf.csv"
+            - name: READ_CSV
+              value: "read_perf.csv"
+            - name: SPARK_CORES_MAX
+              value: "372"
+            - name: SPARK_PARALLELISM
+              value: "372"
+            - name: SPARK_EXECUTOR_CORES
+              value: "8"
+            - name: SPARK_EXECUTOR_INSTANCES
+              value: "46"
+          resources:
+            requests:
+              cpu: "8"
+              memory: "32Gi"
+            limits:
+              cpu: "16"
+              memory: "48Gi"
+          volumeMounts:
+            - name: abe-jars
+              mountPath: /abe-jars
+              readOnly: true
+            - name: abe-spark-root
+              mountPath: /abe-spark
+              readOnly: true
+            - name: hadoop-conf
+              mountPath: /etc/hadoop
+              readOnly: true
+            - name: hadoop-home
+              mountPath: /opt/hadoop
+              readOnly: true
+            - name: results-host
+              mountPath: /results-host
+      volumes:
+        - name: abe-jars
+          hostPath:
+            path: /home/shanlicheng/test-benchmark/ABE-Spark/abe-eac/target
+            type: Directory
+        - name: abe-spark-root
+          hostPath:
+            path: /home/shanlicheng/test-benchmark/ABE-Spark
+            type: Directory
+        - name: hadoop-conf
+          hostPath:
+            path: /home/shanlicheng/opt/hadoop/etc/hadoop
+            type: Directory
+        - name: hadoop-home
+          hostPath:
+            path: /home/shanlicheng/opt/hadoop
+            type: Directory
+        - name: results-host
+          hostPath:
+            path: /home/shanlicheng/test-benchmark/ABE-Spark/result/native-spark
+            type: DirectoryOrCreate

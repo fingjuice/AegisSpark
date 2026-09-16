@@ -1,0 +1,39 @@
+{
+  "header": {
+    "file_path": "hdfs://namenode:9000/data/output/part-001.csv.enc",
+    "abe_headers": [
+      {
+        "column_scope": [
+          "Dept",
+          "Name"
+        ],
+        "policy_expression": "(Department:Developer) OR (Department:HR)",
+        "encrypted_dek": "eyJwb2xpY3kiOiAiKERlcGFydG1lbnQ6RGV2ZWxvcGVyKSBPUiAoRGVwYXJ0bWVudDpIUikiLCAibm9uY2UiOiAiRkFsNDVrVWFVTGxybDUxYiIsICJjdCI6ICJpQkMwRXpxZ005VDRzYjZvV1FUY3d1S3dyRTlwZm9Ha1MxcnlKOHNOMU5rPSJ9"
+      },
+      {
+        "column_scope": [
+          "Salary"
+        ],
+        "policy_expression": "Department:HR",
+        "encrypted_dek": "eyJwb2xpY3kiOiAiRGVwYXJ0bWVudDpIUiIsICJub25jZSI6ICI2V2o3QmpGZ2JjejFhZnZFIiwgImN0IjogIjdCYThsbjA0R1VvOTFXTVpQRk5RQlNPSDdhQlBScWFyUVNrK21iOUNiTGc9In0="
+      }
+    ]
+  },
+  "column_layout": [
+    {
+      "column_name": "Name",
+      "byte_offset": 0,
+      "byte_length": 10
+    },
+    {
+      "column_name": "Dept",
+      "byte_offset": 10,
+      "byte_length": 7
+    },
+    {
+      "column_name": "Salary",
+      "byte_offset": 17,
+      "byte_length": 8
+    }
+  ]
+}
